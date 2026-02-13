@@ -1,0 +1,47 @@
+<main class="page">
+  <h1 class="title">Pacman (Angular 20)</h1>
+
+  <section class="hud">
+    <div class="hud__item">Score: {{ score }}</div>
+    <div class="hud__item">Coins: {{ coinsLeft }}</div>
+    <button class="hud__button" type="button" (click)="reset()">Reset</button>
+  </section>
+
+  <section
+    class="board"
+    [style.--cell.px]="cellSizePx"
+    aria-label="Tablero de juego"
+  >
+    <div class="grid" [style.gridTemplateColumns]="gridTemplateColumns">
+      <ng-container *ngFor="let row of coins; let r = index">
+        <ng-container *ngFor="let cell of row; let c = index">
+          <div class="cell" [attr.data-r]="r" [attr.data-c]="c">
+            <img
+              *ngIf="cell === 1"
+              class="coin"
+              [src]="coinUrl"
+              alt="coin"
+              draggable="false"
+            />
+          </div>
+        </ng-container>
+      </ng-container>
+    </div>
+
+    <img
+      class="pacman"
+      [src]="pacmanUrl"
+      alt="pacman"
+      [style.width.px]="cellSizePx"
+      [style.height.px]="cellSizePx"
+      [style.transform]="pacmanTransform"
+      draggable="false"
+    />
+  </section>
+
+  <p class="help">
+    Usa las flechas del teclado para mover a Pacman. Si pisa una moneda (1),
+    desaparece.
+  </p>
+</main>
+
