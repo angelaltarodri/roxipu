@@ -29,7 +29,20 @@
     </div>
 
     <img
+      *ngIf="dustVisible"
+      class="dust"
+      [src]="dustUrl"
+      alt=""
+      aria-hidden="true"
+      [style.width.px]="cellSizePx"
+      [style.height.px]="cellSizePx"
+      [style.transform]="dustTransform"
+      draggable="false"
+    />
+
+    <img
       class="pacman"
+      [class.pacman--turbo]="turboActive"
       [src]="pacmanUrl"
       alt="pacman"
       [style.width.px]="cellSizePx"
@@ -40,8 +53,7 @@
   </section>
 
   <p class="help">
-    Usa las flechas del teclado para mover a Pacman. Si pisa una moneda (1),
-    desaparece.
+    Usa las flechas del teclado para mover a Pacman. Mantén presionada la barra
+    espaciadora para modo turbo (x2) con nube de polvo y avance automático.
   </p>
 </main>
-

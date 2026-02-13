@@ -55,6 +55,8 @@
   display: grid;
   grid-auto-rows: var(--cell);
   gap: 0;
+  position: relative;
+  z-index: 0;
 }
 
 .cell {
@@ -75,11 +77,28 @@
   position: absolute;
   top: 0;
   left: 0;
+  z-index: 2;
   pointer-events: none;
 
   transform-origin: 50% 50%;
   transition: transform 70ms linear;
   filter: drop-shadow(0 2px 10px rgba(0, 0, 0, 0.6));
+}
+
+.pacman--turbo {
+  filter: drop-shadow(0 2px 10px rgba(0, 0, 0, 0.6)) hue-rotate(-60deg) saturate(10)
+    contrast(1.15) brightness(1.05);
+}
+
+.dust {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+  pointer-events: none;
+  opacity: 0.85;
+  filter: drop-shadow(0 2px 10px rgba(0, 0, 0, 0.6));
+  transition: transform 70ms linear;
 }
 
 .help {
