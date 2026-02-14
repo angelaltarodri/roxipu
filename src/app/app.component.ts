@@ -34,6 +34,7 @@ const ROTATION_DEG: Record<Direction, number> = {
 
 // En turbo avanzamos 1 celda por tick, pero con la mitad del intervalo (más rápido).
 const TURBO_TICK_MS = 40;
+const TURBO_SOUND_START_S = 9;
 
 @Component({
   selector: 'app-root',
@@ -65,6 +66,7 @@ export class AppComponent implements OnDestroy {
   score = 0;
   turboActive = false;
   private turboIntervalId: number | null = null;
+  private turboSound: HTMLAudioElement | null = null;
 
   get rows(): number {
     return this.coins.length;
@@ -113,11 +115,17 @@ export class AppComponent implements OnDestroy {
   }
 
   constructor() {
+    if (typeof Audio !== 'undefined') {
+      this.turboSound = new Audio('assets/ruido.mp3');
+      this.turboSound.preload = 'auto';
+      this.turboSound.load();
+    }
     this.collectCoinIfAny();
   }
 
   ngOnDestroy(): void {
     this.stopTurbo();
+    this.stopTurboSound();
   }
 
   reset(): void {
@@ -128,6 +136,7 @@ export class AppComponent implements OnDestroy {
     this.score = 0;
     this.turboActive = false;
     this.stopTurbo();
+    this.stopTurboSound();
     this.collectCoinIfAny();
   }
 
@@ -142,6 +151,7 @@ export class AppComponent implements OnDestroy {
         return;
       }
       this.turboActive = true;
+      this.playTurboSound();
       this.tickTurbo();
       this.startTurbo();
       return;
@@ -181,12 +191,14 @@ export class AppComponent implements OnDestroy {
     event.preventDefault();
     this.turboActive = false;
     this.stopTurbo();
+    this.stopTurboSound();
   }
 
   @HostListener('window:blur')
   onWindowBlur(): void {
     this.turboActive = false;
     this.stopTurbo();
+    this.stopTurboSound();
   }
 
   private startTurbo(): void {
@@ -209,6 +221,27 @@ export class AppComponent implements OnDestroy {
       return;
     }
     this.moveSteps(this.direction, 1);
+  }
+
+  private playTurboSound(): void {
+    if (!this.turboSound) {
+      return;
+    }
+
+    this.turboSound.pause();
+    try {
+      this.turboSound.currentTime = TURBO_SOUND_START_S;
+    } catch {
+      // Si el metadata aún no cargó, arrancamos desde donde se pueda.
+    }
+    void this.turboSound.play().catch(() => undefined);
+  }
+
+  private stopTurboSound(): void {
+    if (!this.turboSound) {
+      return;
+    }
+    this.turboSound.pause();
   }
 
   private moveSteps(direction: Direction, steps: number): void {
