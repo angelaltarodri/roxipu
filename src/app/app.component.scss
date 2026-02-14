@@ -60,17 +60,33 @@
 }
 
 .cell {
-  transform: scale(2);
   width: var(--cell);
   height: var(--cell);
   display: grid;
   place-items: center;
+  background: #000;
 }
 
 .coin {
+  transform: scale(2);
   width: calc(var(--cell) * 0.38);
   height: calc(var(--cell) * 0.38);
   image-rendering: auto;
+}
+
+.chocolate {
+  width: calc(var(--cell) * 0.62);
+  height: calc(var(--cell) * 0.62);
+  object-fit: contain;
+}
+
+.cell--revealed {
+  background-image: var(--bg-image, url('/assets/quieresser.jpeg'));
+  background-repeat: no-repeat;
+  background-size: var(--bg-size) var(--bg-size);
+  background-position:
+    calc(var(--bg-offset-x) - var(--c) * var(--cell))
+    calc(var(--bg-offset-y) - var(--r) * var(--cell));
 }
 
 .pacman {
@@ -108,4 +124,83 @@
   text-align: center;
   max-width: 680px;
   line-height: 1.35;
+}
+
+.shii {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 10px;
+  padding: 2px 10px;
+  min-height: 44px;
+  border-radius: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  background: rgb(255, 29, 29);
+  color: #fff;
+  font-weight: 800;
+  font-size: 18px;
+  letter-spacing: 0.4px;
+  box-shadow:
+    0 0 0 2px rgba(255, 255, 255, 0.06),
+    0 14px 40px rgba(0, 0, 0, 0.6);
+  user-select: none;
+}
+
+.shii:hover {
+  background: rgb(89, 255, 0);
+  color: black;
+  cursor: pointer; 
+
+  .shii-2 {
+    display: flex;
+    margin-left: 5px;
+  }
+}
+
+.shii-2 {
+  display: none;
+}
+
+.no {
+  width: 50px;
+  height: 45px;
+  text-align: center;
+  background-color: blue;
+  padding: 10px;
+  font-weight: 900;
+  border-radius: 10px;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  transition: all 2s ease;
+  &:hover {
+    cursor: pointer;
+  }
+}
+
+.no-extended {
+  width: 280px;
+  text-align: start;
+}
+.no-hidden {
+  transition: all 0s ease 0s;
+  opacity: 0;
+}
+
+.appear {
+  transition: all 1s ease 2s;
+  opacity: 1;
+}
+
+.fireworks-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 20;
+}
+
+.firework {
+  position: absolute;
+  height: auto;
+  max-width: 320px;
+  mix-blend-mode: screen;
+  filter: drop-shadow(0 6px 22px rgba(255, 255, 255, 0.25));
 }

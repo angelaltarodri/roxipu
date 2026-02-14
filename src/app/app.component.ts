@@ -3,6 +3,18 @@ import { Component, HostListener, OnDestroy } from '@angular/core';
 
 type Cell = 0 | 1;
 type Direction = 'up' | 'down' | 'left' | 'right';
+type GameMode = 'coins' | 'chocolate';
+type MusicKind = 'lavida' | 'baazigar';
+type Firework = {
+  src: string;
+  widthPx: number;
+  top?: string;
+  left?: string;
+  right?: string;
+  bottom?: string;
+  opacity?: number;
+  transform?: string;
+};
 
 // 👇 Constante (array de arrays 0/1) para renderizar monedas (filas x columnas).
 const COIN_GRID = [
@@ -35,6 +47,8 @@ const ROTATION_DEG: Record<Direction, number> = {
 // En turbo avanzamos 1 celda por tick, pero con la mitad del intervalo (más rápido).
 const TURBO_TICK_MS = 40;
 const TURBO_SOUND_START_S = 9;
+const CHOCOLATE_BITE_SOUND_DURATION_MS = 120;
+const BAAZIGAR_START_S = 1 * 60 + 59;
 
 @Component({
   selector: 'app-root',
@@ -45,6 +59,7 @@ const TURBO_SOUND_START_S = 9;
 })
 export class AppComponent implements OnDestroy {
   readonly cellSizePx = 48;
+  extended = false;
 
   // Coin GIF (1 = coin, 0 = vacío/negro)
   readonly coinUrl =
@@ -58,7 +73,62 @@ export class AppComponent implements OnDestroy {
   readonly dustUrl =
     'https://static.vecteezy.com/system/resources/thumbnails/014/500/568/small/white-cloud-cutout-on-the-background-and-texture-png.png';
 
+  // Chocolate (cuando ya no queden monedas)
+  readonly chocolateUrl = 'https://cdn-icons-png.flaticon.com/512/3465/3465221.png';
+
+  readonly fireworks: readonly Firework[] = [
+    {
+      src: 'https://upload.wikimedia.org/wikipedia/commons/c/cd/Animated_Fireworks.gif',
+      widthPx: 220,
+      top: '6%',
+      left: '3%',
+      opacity: 0.78,
+      transform: 'rotate(-8deg)'
+    },
+    {
+      src: 'https://upload.wikimedia.org/wikipedia/commons/e/e1/Wikipedia20_animated_Fireworks_1MB.gif',
+      widthPx: 170,
+      top: '10%',
+      right: '4%',
+      opacity: 0.9,
+      transform: 'rotate(10deg)'
+    },
+    {
+      src: 'https://upload.wikimedia.org/wikipedia/commons/d/df/Feuerwerks-gif.gif',
+      widthPx: 200,
+      bottom: '8%',
+      left: '6%',
+      opacity: 0.75,
+      transform: 'rotate(6deg)'
+    },
+    {
+      src: 'https://upload.wikimedia.org/wikipedia/commons/c/cd/Animated_Fireworks.gif',
+      widthPx: 260,
+      bottom: '6%',
+      right: '5%',
+      opacity: 0.68,
+      transform: 'rotate(-6deg)'
+    },
+    {
+      src: 'https://upload.wikimedia.org/wikipedia/commons/e/e1/Wikipedia20_animated_Fireworks_1MB.gif',
+      widthPx: 190,
+      top: '42%',
+      left: '6%',
+      opacity: 0.78,
+      transform: 'rotate(-14deg)'
+    },
+    {
+      src: 'https://upload.wikimedia.org/wikipedia/commons/d/df/Feuerwerks-gif.gif',
+      widthPx: 180,
+      top: '44%',
+      right: '7%',
+      opacity: 0.78,
+      transform: 'rotate(14deg)'
+    }
+  ];
+
   coins: Cell[][] = this.cloneGrid(COIN_GRID);
+  chocolates: Cell[][] | null = null;
 
   pacRow = 1;
   pacCol = 1;
@@ -67,6 +137,16 @@ export class AppComponent implements OnDestroy {
   turboActive = false;
   private turboIntervalId: number | null = null;
   private turboSound: HTMLAudioElement | null = null;
+  private lavidaSong: HTMLAudioElement | null = null;
+  private baazigarSong: HTMLAudioElement | null = null;
+  private activeSong: MusicKind | null = null;
+  private coinSoundPreload: HTMLAudioElement | null = null;
+  private chocolateBiteSoundPreload: HTMLAudioElement | null = null;
+  private chocolateBiteStopTimeoutId: number | null = null;
+
+  mode: GameMode = 'coins';
+  remainingCoins = 0;
+  remainingChocolates = 0;
 
   get rows(): number {
     return this.coins.length;
@@ -78,6 +158,30 @@ export class AppComponent implements OnDestroy {
 
   get gridTemplateColumns(): string {
     return `repeat(${this.cols}, ${this.cellSizePx}px)`;
+  }
+
+  get boardWidthPx(): number {
+    return this.cols * this.cellSizePx;
+  }
+
+  get boardHeightPx(): number {
+    return this.rows * this.cellSizePx;
+  }
+
+  get bgSizePx(): number {
+    return Math.min(this.boardWidthPx, this.boardHeightPx);
+  }
+
+  get bgOffsetXPx(): number {
+    return (this.boardWidthPx - this.bgSizePx) / 2;
+  }
+
+  get bgOffsetYPx(): number {
+    return (this.boardHeightPx - this.bgSizePx) / 2;
+  }
+
+  get bgImageCss(): string {
+    return this.extended ? "url('/assets/roxi3.jpeg')" : "url('/assets/quieresser.jpeg')";
   }
 
   get pacmanTransform(): string {
@@ -106,12 +210,16 @@ export class AppComponent implements OnDestroy {
     return `translate3d(${x}px, ${y}px, 0) scale(0.95)`;
   }
 
+  get isChocolateMode(): boolean {
+    return this.mode === 'chocolate';
+  }
+
   get coinsLeft(): number {
-    return this.coins.reduce(
-      (accRow, row) =>
-        accRow + row.reduce<number>((acc, cell) => acc + (cell === 1 ? 1 : 0), 0),
-      0
-    );
+    return this.mode === 'coins' ? this.remainingCoins : 0;
+  }
+
+  get chocolatesLeft(): number {
+    return this.mode === 'chocolate' ? this.remainingChocolates : 0;
   }
 
   constructor() {
@@ -119,17 +227,47 @@ export class AppComponent implements OnDestroy {
       this.turboSound = new Audio('assets/ruido.mp3');
       this.turboSound.preload = 'auto';
       this.turboSound.load();
+
+      this.coinSoundPreload = new Audio('assets/mariocoin.mp3');
+      this.coinSoundPreload.preload = 'auto';
+      this.coinSoundPreload.load();
+
+      this.chocolateBiteSoundPreload = new Audio('assets/gogo.mp3');
+      this.chocolateBiteSoundPreload.preload = 'auto';
+      this.chocolateBiteSoundPreload.load();
+
+      this.lavidaSong = new Audio('assets/lavidaesgogo.mp3');
+      this.lavidaSong.preload = 'auto';
+      this.lavidaSong.loop = true;
+      this.lavidaSong.load();
+
+      this.baazigarSong = new Audio('assets/baazigar.mp3');
+      this.baazigarSong.preload = 'auto';
+      this.baazigarSong.loop = false;
+      this.baazigarSong.load();
+      this.baazigarSong.addEventListener('ended', () => {
+        if (this.activeSong !== 'baazigar') {
+          return;
+        }
+        this.playBaazigarSong();
+      });
     }
-    this.collectCoinIfAny();
+
+    this.remainingCoins = this.countOnes(this.coins);
+    this.collectIfAny();
   }
 
   ngOnDestroy(): void {
     this.stopTurbo();
     this.stopTurboSound();
+    this.stopBackgroundMusic();
+    this.stopChocolateBiteSound();
   }
 
   reset(): void {
     this.coins = this.cloneGrid(COIN_GRID);
+    this.chocolates = null;
+    this.extended = false;
     this.pacRow = 1;
     this.pacCol = 1;
     this.direction = 'right';
@@ -137,7 +275,18 @@ export class AppComponent implements OnDestroy {
     this.turboActive = false;
     this.stopTurbo();
     this.stopTurboSound();
-    this.collectCoinIfAny();
+    this.stopBackgroundMusic();
+    this.stopChocolateBiteSound();
+
+    this.mode = 'coins';
+    this.remainingCoins = this.countOnes(this.coins);
+    this.remainingChocolates = 0;
+    this.collectIfAny();
+  }
+
+  toggleExtended(): void {
+    this.extended = !this.extended;
+    this.syncBackgroundMusic();
   }
 
   @HostListener('window:keydown', ['$event'])
@@ -244,6 +393,80 @@ export class AppComponent implements OnDestroy {
     this.turboSound.pause();
   }
 
+  private playChocolateBiteSound(): void {
+    // Chocolate NO debe solaparse consigo mismo: cada mordida reinicia el sonido anterior.
+    const audio = this.chocolateBiteSoundPreload;
+    if (!audio) {
+      return;
+    }
+
+    if (this.chocolateBiteStopTimeoutId !== null) {
+      window.clearTimeout(this.chocolateBiteStopTimeoutId);
+      this.chocolateBiteStopTimeoutId = null;
+    }
+
+    audio.pause();
+    try {
+      audio.currentTime = 0;
+    } catch {
+      // Si el metadata aún no cargó, arrancamos desde donde se pueda.
+    }
+    void audio.play().catch(() => undefined);
+
+    this.chocolateBiteStopTimeoutId = window.setTimeout(() => {
+      audio.pause();
+      this.chocolateBiteStopTimeoutId = null;
+    }, CHOCOLATE_BITE_SOUND_DURATION_MS);
+  }
+
+  private playCoinSound(): void {
+    this.playOverlappingSound('assets/mariocoin.mp3');
+  }
+
+  private stopChocolateBiteSound(): void {
+    if (this.chocolateBiteStopTimeoutId !== null) {
+      window.clearTimeout(this.chocolateBiteStopTimeoutId);
+      this.chocolateBiteStopTimeoutId = null;
+    }
+    if (!this.chocolateBiteSoundPreload) {
+      return;
+    }
+    this.chocolateBiteSoundPreload.pause();
+    try {
+      this.chocolateBiteSoundPreload.currentTime = 0;
+    } catch {
+      // ignore
+    }
+  }
+
+  private playOverlappingSound(
+    src: string,
+    options?: { startSeconds?: number; durationMs?: number }
+  ): void {
+    if (typeof Audio === 'undefined') {
+      return;
+    }
+
+    const audio = new Audio(src);
+    audio.preload = 'auto';
+
+    if (options?.startSeconds !== undefined) {
+      try {
+        audio.currentTime = options.startSeconds;
+      } catch {
+        // Si el metadata aún no cargó, arrancamos desde donde se pueda.
+      }
+    }
+
+    void audio.play().catch(() => undefined);
+
+    if (options?.durationMs !== undefined) {
+      window.setTimeout(() => {
+        audio.pause();
+      }, options.durationMs);
+    }
+  }
+
   private moveSteps(direction: Direction, steps: number): void {
     const { dr, dc } = DIR_DELTA[direction];
     for (let i = 0; i < steps; i++) {
@@ -257,7 +480,19 @@ export class AppComponent implements OnDestroy {
 
       this.pacRow = nextRow;
       this.pacCol = nextCol;
-      this.collectCoinIfAny();
+      this.collectIfAny();
+    }
+  }
+
+  private collectIfAny(): void {
+    if (this.mode === 'chocolate') {
+      this.collectChocolateIfAny();
+      return;
+    }
+
+    this.collectCoinIfAny();
+    if (this.remainingCoins === 0) {
+      this.enterChocolateMode();
     }
   }
 
@@ -269,9 +504,125 @@ export class AppComponent implements OnDestroy {
 
     this.coins[this.pacRow][this.pacCol] = 0;
     this.score += 1;
+    this.remainingCoins = Math.max(0, this.remainingCoins - 1);
+    this.playCoinSound();
+  }
+
+  private enterChocolateMode(): void {
+    if (this.mode === 'chocolate') {
+      return;
+    }
+
+    this.mode = 'chocolate';
+    this.syncBackgroundMusic();
+    this.chocolates = Array.from({ length: this.rows }, () =>
+      Array.from({ length: this.cols }, () => 1 as Cell)
+    );
+    this.remainingChocolates = this.rows * this.cols;
+    this.collectChocolateIfAny();
+  }
+
+  private collectChocolateIfAny(): void {
+    const cell = this.chocolates?.[this.pacRow]?.[this.pacCol];
+    if (cell !== 1 || !this.chocolates) {
+      return;
+    }
+
+    this.chocolates[this.pacRow][this.pacCol] = 0;
+    this.score += 1;
+    this.remainingChocolates = Math.max(0, this.remainingChocolates - 1);
+    this.playChocolateBiteSound();
+  }
+
+  private syncBackgroundMusic(): void {
+    if (this.mode !== 'chocolate') {
+      this.stopBackgroundMusic();
+      return;
+    }
+
+    const desired: MusicKind = this.extended ? 'baazigar' : 'lavida';
+    if (this.activeSong === desired) {
+      return;
+    }
+
+    this.stopBackgroundMusic();
+    this.activeSong = desired;
+    if (desired === 'baazigar') {
+      this.playBaazigarSong();
+    } else {
+      this.playLavidaSong();
+    }
+  }
+
+  private playLavidaSong(): void {
+    if (!this.lavidaSong) {
+      return;
+    }
+    this.playMusicFrom(this.lavidaSong, 0);
+  }
+
+  private playBaazigarSong(): void {
+    if (!this.baazigarSong) {
+      return;
+    }
+    this.playMusicFrom(this.baazigarSong, BAAZIGAR_START_S);
+  }
+
+  private playMusicFrom(audio: HTMLAudioElement, startSeconds: number): void {
+    const start = () => {
+      try {
+        audio.currentTime = startSeconds;
+      } catch {
+        // Si el metadata aún no cargó, arrancamos desde donde se pueda.
+      }
+      void audio.play().catch(() => undefined);
+    };
+
+    audio.pause();
+    if (audio.readyState >= 1) {
+      start();
+      return;
+    }
+
+    audio.addEventListener('loadedmetadata', start, { once: true });
+    audio.load();
+  }
+
+  private stopBackgroundMusic(): void {
+    this.activeSong = null;
+
+    if (this.lavidaSong) {
+      this.lavidaSong.pause();
+      try {
+        this.lavidaSong.currentTime = 0;
+      } catch {
+        // ignore
+      }
+    }
+
+    if (this.baazigarSong) {
+      this.baazigarSong.pause();
+      try {
+        this.baazigarSong.currentTime = 0;
+      } catch {
+        // ignore
+      }
+    }
   }
 
   private cloneGrid(grid: readonly (readonly Cell[])[]): Cell[][] {
     return grid.map((row) => [...row]);
+  }
+
+  private countOnes(grid: readonly (readonly Cell[])[]): number {
+    let count = 0;
+    for (const row of grid) {
+      for (const cell of row) {
+        if (cell === 1) {
+          count += 1;
+        }
+      }
+    }
+    return count;
   }
 }

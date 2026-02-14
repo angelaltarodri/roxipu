@@ -1,26 +1,64 @@
 <main class="page">
+  <div *ngIf="extended" class="fireworks-layer" aria-hidden="true">
+    <img
+      *ngFor="let fw of fireworks"
+      class="firework"
+      [src]="fw.src"
+      alt=""
+      draggable="false"
+      [style.width.px]="fw.widthPx"
+      [style.top]="fw.top"
+      [style.left]="fw.left"
+      [style.right]="fw.right"
+      [style.bottom]="fw.bottom"
+      [style.opacity]="fw.opacity ?? 0.85"
+      [style.transform]="fw.transform ?? 'none'"
+    />
+  </div>
   <h1 class="title">Para Ñañapú</h1>
 
   <section class="hud">
     <div class="hud__item">Puntos: {{ score }}</div>
-    <div class="hud__item">Te quedan: {{ coinsLeft }}</div>
+    <div class="hud__item">
+      Te quedan: {{ isChocolateMode ? chocolatesLeft : coinsLeft }}
+    </div>
     <button class="hud__button" type="button" (click)="reset()">Reset</button>
   </section>
 
   <section
     class="board"
     [style.--cell.px]="cellSizePx"
+    [style.--bg-size.px]="bgSizePx"
+    [style.--bg-offset-x.px]="bgOffsetXPx"
+    [style.--bg-offset-y.px]="bgOffsetYPx"
+    [style.--bg-image]="bgImageCss"
     aria-label="Tablero de juego"
   >
     <div class="grid" [style.gridTemplateColumns]="gridTemplateColumns">
       <ng-container *ngFor="let row of coins; let r = index">
         <ng-container *ngFor="let cell of row; let c = index">
-          <div class="cell" [attr.data-r]="r" [attr.data-c]="c">
+          <div
+            class="cell"
+            [class.cell--revealed]="
+              isChocolateMode && chocolates?.[r]?.[c] === 0
+            "
+            [style.--r]="r"
+            [style.--c]="c"
+            [attr.data-r]="r"
+            [attr.data-c]="c"
+          >
             <img
-              *ngIf="cell === 1"
+              *ngIf="!isChocolateMode && cell === 1"
               class="coin"
               [src]="coinUrl"
               alt="coin"
+              draggable="false"
+            />
+            <img
+              *ngIf="isChocolateMode && chocolates?.[r]?.[c] === 1"
+              class="chocolate"
+              [src]="chocolateUrl"
+              alt="chocolate"
               draggable="false"
             />
           </div>
@@ -52,8 +90,27 @@
     />
   </section>
 
-  <div class="help" >
-    Usa las flechas del teclado para mover a Pacman. Mantén presionada la barra
-    espaciadora para modo turbo (x2) con nube de polvo y avance automático shii.
+  <div class="help">
+    @if (!extended) {
+      Usa las flechas del teclado para mover a Pacman. Mantén presionada la
+      barra espaciadora para modo turbo (más rápido) con nube de polvo y avance
+      automático
+    } @else {
+		Y vivieron felices comiendo salchialita broaster. <br>
+	}
+    <span [class.shii]="isChocolateMode && chocolatesLeft === 0">
+      shii
+      <span class="shii-2"> shii </span> </span
+    >.
   </div>
+
+  @if (isChocolateMode && chocolatesLeft === 0) {
+    o tal vez
+    <div class="no" [class.no-extended]="extended" (click)="toggleExtended()">
+      No
+      <span class="no-hidden" [class.appear]="extended"
+        >lo dudaría ni por un segundo
+      </span>
+    </div>
+  }
 </main>
